@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Transcendence Simulator</title>
+  <!-- Bootstrap CDN 사용 -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    #map-container {
+      position: relative;
+    }
+    #map-image {
+      border: 1px solid #ccc;
+    }
+    #special-tiles {
+      margin-top: 10px;
+    }
+    .draggable-tile {
+      width: 50px;
+      height: 50px;
+      margin: 5px;
+      cursor: grab;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <!-- 상단 컨트롤: 부위, 단계, 가호, Monte Carlo Count, 카테고리 확정 -->
+  <div class="row mt-3">
+    <div class="col">
+      <select id="part" class="form-control d-inline-block" style="width:auto;">
+        <option value="투구">투구</option>
+        <option value="어깨">어깨</option>
+        <option value="상의">상의</option>
+        <option value="하의">하의</option>
+        <option value="장갑">장갑</option>
+        <option value="무기">무기</option>
+      </select>
+      <select id="stage" class="form-control d-inline-block" style="width:auto;">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+      </select>
+      <select id="gaho" class="form-control d-inline-block" style="width:auto;">
+        <option value="0">0</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+      </select>
+      <input type="number" id="monte_count" class="form-control d-inline-block" style="width:150px;" placeholder="Monte Carlo Count" value="1000">
+      <button id="set_category" class="btn btn-primary">카테고리 확정</button>
+    </div>
+  </div>
+  <!-- 본문: 좌측 맵, 우측 시뮬레이션 정보 및 주사위 입력 -->
+  <div class="row mt-3">
+    <!-- 좌측: 맵 영역 (드래그앤드롭 가능) -->
+    <div class="col-md-6">
+      <div id="map-container">
+        <img id="map-image" src="/map_image" width="400" height="400" alt="Map">
+      </div>
+      <!-- 하단: 드래그 가능한 특수 타일 -->
+      <div id="special-tiles">
+        <img src="/static/전개.png" class="draggable-tile" draggable="true" data-tile="전개">
+        <img src="/static/강화.png" class="draggable-tile" draggable="true" data-tile="강화">
+        <img src="/static/각성.png" class="draggable-tile" draggable="true" data-tile="각성">
+        <img src="/static/복제.png" class="draggable-tile" draggable="true" data-tile="복제">
+        <img src="/static/정화.png" class="draggable-tile" draggable="true" data-tile="정화">
+        <div class="draggable-tile border text-center" draggable="true" data-tile="에이전트" style="line-height:50px;">A</div>
+      </div>
+    </div>
+    <!-- 우측: 시뮬레이션 제어 및 정보 표시 -->
+    <div class="col-md-6">
+      <div class="form-group">
+        <label for="dice_input">주사위 (0=확률만, 1~4=이동):</label>
+        <input type="text" id="dice_input" class="form-control" value="0">
+      </div>
+      <button id="simulate_step" class="btn btn-success">계산</button>
+      <hr>
+      <div class="form-group">
+        <label>남은 액션:</label>
+        <p id="actions_text"></p>
+      </div>
+      <div class="form-group">
+        <label>주사위 정보:</label>
+        <pre id="dice_info" style="background-color:#f8f9fa; padding:10px;"></pre>
+      </div>
+      <div class="form-group">
+        <label>성공확률:</label>
+        <p id="prob_text"></p>
+      </div>
+      <div class="form-group">
+        <label>추천:</label>
+        <p id="rec_text"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- jQuery 및 JavaScript 코드 -->
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script>
+$(document).ready(function(){
+  // 카테고리 확정 버튼 클릭 시
+  $("#set_category").click(function(){
+    let data = {
+      part: $("#part").val(),
+      stage: $("#stage").val(),
+      gaho: $("#gaho").val(),
+      monte_count: $("#monte_count").val()
+    };
+    $.ajax({
+      url: "/set_category",
+      method: "POST",
+      contentType: "application/json",
+      data: JSON.stringify(data),
+      success: function(response){
+        $("#actions_text").text(response.actions_text);
+        $("#dice_info").text(response.dice_info);
+        $("#prob_text").text(response.prob_text);
+        $("#rec_text").text(response.rec_text);
+        $("#map-image").attr("src", "/map_image?" + new Date().getTime());
+      }
+    });
+  });
+
+  // 계산 버튼 클릭 시 (주사위 굴림)
+  $("#simulate_step").click(function(){
+    let data = {
+      dice_input: $("#dice_input").val(),
+      monte_count: $("#monte_count").val()
+    };
+    $.ajax({
+      url: "/simulate_step",
+      method: "POST",
+      contentType: "application/json",
+      data: JSON.stringify(data),
+      success: function(response){
+        $("#actions_text").text(response.actions_text);
+        $("#dice_info").text(response.dice_info);
+        $("#prob_text").text(response.prob_text);
+        $("#rec_text").text(response.rec_text);
+        $("#map-image").attr("src", "/map_image?" + new Date().getTime());
+      }
+    });
+  });
+
+  // 맵 이미지에 드래그오버, 드롭 이벤트 등록
+  $("#map-image").on("dragover", function(e){
+    e.preventDefault();
+  });
+
+  $("#map-image").on("drop", function(e){
+    e.preventDefault();
+    let tileType = e.originalEvent.dataTransfer.getData("tile");
+    let offset = $(this).offset();
+    let x = e.originalEvent.pageX - offset.left;
+    let y = e.originalEvent.pageY - offset.top;
+    // 각 타일 크기 50px 기준으로 격자 좌표 산출
+    let col = Math.floor(x / 50);
+    let row = Math.floor(y / 50);
+    let data = {
+      tile_type: tileType,
+      row: row,
+      col: col
+    };
+    $.ajax({
+      url: "/place_tile",
+      method: "POST",
+      contentType: "application/json",
+      data: JSON.stringify(data),
+      success: function(response){
+        $("#actions_text").text(response.actions_text);
+        $("#dice_info").text(response.dice_info);
+        $("#prob_text").text(response.prob_text);
+        $("#rec_text").text(response.rec_text);
+        $("#map-image").attr("src", "/map_image?" + new Date().getTime());
+      }
+    });
+  });
+
+  // 특수 타일 드래그 이벤트
+  $(".draggable-tile").on("dragstart", function(e){
+    e.originalEvent.dataTransfer.setData("tile", $(this).data("tile"));
+  });
+});
+</script>
+</body>
+</html>
+
